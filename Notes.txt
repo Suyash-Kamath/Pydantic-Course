@@ -7,3 +7,5 @@ hitesh sir is using uv , you can use python and its virtual environment
 this package is useful if you use environment variables then use pydantic-settings and python-dotenv
 
 the only role of pydantic is to provide type-safety
+
+comparators
