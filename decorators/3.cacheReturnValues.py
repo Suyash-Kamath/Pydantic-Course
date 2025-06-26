@@ -21,3 +21,4 @@ def long_running_function(a,b):
 
 print(long_running_function(2,3))
 print(long_running_function(2,3))
+print(long_running_function(4,3))
