@@ -19,6 +19,3 @@ input_data = {
 user = User(**input_data)
 
 print(user)
-
-
-
