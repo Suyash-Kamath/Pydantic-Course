@@ -13,7 +13,7 @@ def debug(func):
 
         
     return wrapper
-
+# .items() is a built-in dictionary method that returns each key-value pair as a tuple., .items() returns a view object, not a list — and that view cannot be appended to.
 @debug
 def hello():
     print("Hello")
