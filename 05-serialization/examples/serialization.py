@@ -43,7 +43,7 @@ user = User(
 # Convert to Python dict
 python_dict = user.model_dump()
 print("Python dict:", python_dict)
-print("=================================================================\n")
+print("\n=================================================================\n")
 # Convert to JSON string (custom datetime format will apply here)
 json_str = user.model_dump_json()
 print("JSON string:", json_str)
