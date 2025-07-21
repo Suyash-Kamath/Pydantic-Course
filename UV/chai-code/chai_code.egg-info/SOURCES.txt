@@ -1,0 +1,8 @@
+README.md
+main.py
+pyproject.toml
+chai_code.egg-info/PKG-INFO
+chai_code.egg-info/SOURCES.txt
+chai_code.egg-info/dependency_links.txt
+chai_code.egg-info/requires.txt
+chai_code.egg-info/top_level.txt
