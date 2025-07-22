@@ -1,0 +1,109 @@
+Yes! Great observation.
+
+✅ **Packing and unpacking** are both happening in this code. Let's break it down clearly:
+
+---
+
+### 🧳 What is Packing?
+
+**Packing** happens when `*args` and `**kwargs` **gather** any number of positional and keyword arguments into tuples and dictionaries.
+
+#### In this line:
+
+```python
+def wrapper(*args, **kwargs):
+```
+
+* `*args` **packs** all positional arguments into a tuple.
+* `**kwargs` **packs** all keyword arguments into a dictionary.
+
+🔹 Example:
+
+```python
+@cache
+def greet(name, age=0):
+    return f"Hi {name}, age {age}"
+
+greet("Hari", age=25)
+```
+
+➡️ Inside `wrapper`, it becomes:
+
+```python
+args = ('Hari',)
+kwargs = {'age': 25}
+```
+
+---
+
+### 🎁 What is Unpacking?
+
+**Unpacking** happens when `*args` and `**kwargs` are used to **pass** the arguments to another function.
+
+#### In this line:
+
+```python
+result = func(*args, **kwargs)
+```
+
+Here, `*args` and `**kwargs` are **unpacked** — the tuple and dictionary are broken down and passed as individual arguments to `func`.
+
+So this:
+
+```python
+func(*args, **kwargs)
+```
+
+is the same as doing:
+
+```python
+func('Hari', age=25)
+```
+
+---
+
+### ⚠️ One subtle bug in your code:
+
+You're only caching based on `args`:
+
+```python
+if args in cache_values:
+```
+
+But `kwargs` is ignored in the key, which means:
+
+```python
+func(2, b=3)  # kwargs
+func(2, 3)    # only args
+```
+
+→ Might produce **wrong cache reuse** even if arguments differ!
+
+---
+
+### ✅ Correct way (including kwargs):
+
+To make it cache based on both positional and keyword arguments, you can do:
+
+```python
+def wrapper(*args, **kwargs):
+    key = (args, frozenset(kwargs.items()))
+    if key in cache_values:
+        return cache_values[key]
+    result = func(*args, **kwargs)
+    cache_values[key] = result
+    return result
+```
+
+`frozenset` is used because dictionaries are unhashable and can't be used as keys — but frozenset of its items can.
+
+---
+
+### ✅ Summary
+
+| Concept   | Where It Happens               |
+| --------- | ------------------------------ |
+| Packing   | `def wrapper(*args, **kwargs)` |
+| Unpacking | `func(*args, **kwargs)`        |
+
+Let me know if you want to explore how caching affects performance or how to add a size limit to the cache (like LRU cache)!
