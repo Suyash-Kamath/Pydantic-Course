@@ -107,3 +107,757 @@ def wrapper(*args, **kwargs):
 | Unpacking | `func(*args, **kwargs)`        |
 
 Let me know if you want to explore how caching affects performance or how to add a size limit to the cache (like LRU cache)!
+
+
+Absolutely, let's go step by step.
+
+---
+
+## ✅ Modified Version: Correct Caching with `args` + `kwargs`
+
+```python
+def cache(func):
+    cache_values = {}
+
+    def wrapper(*args, **kwargs):
+        # ✅ Create a key using args and frozenset of kwargs
+        key = (args, frozenset(kwargs.items()))
+
+        if key in cache_values:
+            return cache_values[key]
+
+        result = func(*args, **kwargs)
+        cache_values[key] = result
+        return result
+
+    return wrapper
+```
+
+---
+
+## 🔍 Why was the change needed?
+
+Previously, you only did:
+
+```python
+if args in cache_values:
+```
+
+That means it only checks for positional arguments.
+
+But if someone uses **keyword arguments**, like:
+
+```python
+slow_add(2, b=3)
+```
+
+and another calls:
+
+```python
+slow_add(2, 3)
+```
+
+These are **not the same**, but your old cache treats them as identical because `kwargs` was ignored.
+
+So, now we combine:
+
+* `args`: tuple of positional arguments (already hashable ✅)
+* `kwargs.items()`: converted to `frozenset`, which is hashable ✅
+
+Now the cache key becomes:
+
+```python
+((2,), frozenset({('b', 3)}))
+```
+
+---
+
+## ❗ Why can’t we just do this?
+
+```python
+key = (args, kwargs)
+```
+
+Because `kwargs` is a `dict`, and:
+
+### 🔥 Dicts are **unhashable**
+
+* Why? Because **mutable** objects (like `dict`) can **change**, and dictionaries use hash keys that must **stay the same**.
+* Hashable = can be used as a dictionary key or set element.
+* Mutable = contents can change → so hash value can become inconsistent → unsafe.
+
+---
+
+## 🧊 What is `frozenset`?
+
+Think of `frozenset` as:
+
+> A frozen (immutable) version of a `set`.
+
+### ✅ Key points:
+
+* It cannot be changed after creation (immutable).
+* It is **hashable**, so can be used as a key in a dictionary or an element in a set.
+* Useful to represent unordered collections that shouldn’t change.
+
+### Example:
+
+```python
+s = frozenset([("a", 1), ("b", 2)])
+print(hash(s))  # ✅ works
+```
+
+But:
+
+```python
+d = {("a", 1): 100}
+print(hash(d))  # ❌ error: dict is unhashable
+```
+
+---
+
+### 🎯 TL;DR Summary:
+
+| Concept             | Explanation                                                              |
+| ------------------- | ------------------------------------------------------------------------ |
+| `*args`             | Packs positional arguments into a tuple                                  |
+| `**kwargs`          | Packs keyword arguments into a dictionary                                |
+| `frozenset`         | Immutable and hashable version of set — used to make kwargs hashable     |
+| `kwargs` unhashable | Because dicts can change, they cannot be used as dictionary keys         |
+| New cache key       | `(args, frozenset(kwargs.items()))` — makes it cache-safe for all inputs |
+
+---
+
+Want me to show you this with a working function and print output?
+
+Absolutely Hari! Let me now **explain everything in a real-life friendly and crystal clear way** — no jargon, no shortcuts.
+
+---
+
+## 💡 Let's understand **"Hashable"** first
+
+### 📦 Hashable means:
+
+Something can be used as a **key in a dictionary** or **stored in a set** — but **only** if it **cannot change** after being created.
+
+Why? Because dictionary keys and set elements **must stay the same forever** — like a **label on a locker**. You can't change the label after sticking it on.
+
+---
+
+## ❓So what is considered **Hashable**?
+
+| Type        | Hashable? | Why?                                     |
+| ----------- | --------- | ---------------------------------------- |
+| `int`       | ✅ Yes     | Cannot change                            |
+| `str`       | ✅ Yes     | Cannot change                            |
+| `tuple`     | ✅ Yes     | But only if inside data is also hashable |
+| `list`      | ❌ No      | Can be changed anytime                   |
+| `dict`      | ❌ No      | Keys/values can change                   |
+| `set`       | ❌ No      | Unordered & changeable                   |
+| `frozenset` | ✅ Yes     | Frozen version of set — immutable        |
+
+---
+
+## 🧪 Quick Code Examples:
+
+```python
+hash(5)            # ✅ Okay
+hash("hello")      # ✅ Okay
+hash((1, 2))       # ✅ Okay
+hash([1, 2])       # ❌ Error: list is unhashable
+hash({"a": 1})     # ❌ Error: dict is unhashable
+```
+
+---
+
+## 🧊 What is `frozenset` and why do we need it?
+
+Let’s say you have this dictionary:
+
+```python
+kwargs = {'age': 25, 'location': 'Mumbai'}
+```
+
+You **can't** use this directly as a key:
+
+```python
+key = (args, kwargs)       # ❌ error
+```
+
+But if you **freeze** the dictionary’s items into a `frozenset`:
+
+```python
+frozenset(kwargs.items())  # ✅ okay
+```
+
+It becomes something like:
+
+```python
+frozenset({('age', 25), ('location', 'Mumbai')})
+```
+
+This **can now be used as a dictionary key**.
+
+---
+
+## 🔄 Real-life Analogy
+
+### Think of `dict` like a "Whiteboard":
+
+* You can erase or change what's written — mutable
+* You **can't** use a whiteboard as a permanent locker key — because it changes
+
+### Think of `frozenset` like a "Stone-carved slab":
+
+* Once carved, it can't be changed — immutable
+* So it **can** be used as a locker key (a key in a dictionary)
+
+---
+
+## 🧠 So why is `tuple` hashable and `list` not?
+
+* **`list`**: Mutable (you can change its content anytime)
+
+  ```python
+  my_list = [1, 2]
+  my_list.append(3)  # Changes content
+  ```
+
+* **`tuple`**: Immutable (you can't change its content after creation)
+
+  ```python
+  my_tuple = (1, 2)
+  # my_tuple[0] = 10  # ❌ Error
+  ```
+
+So `tuple` can be **safely used as a key**. But `list` and `dict` cannot.
+
+BUT: a tuple is **only hashable** if **all its elements** are also hashable.
+
+---
+
+## 💥 Final Practical Example
+
+```python
+def cache(func):
+    cache_values = {}
+
+    def wrapper(*args, **kwargs):
+        key = (args, frozenset(kwargs.items()))  # make key from both
+
+        if key in cache_values:
+            return cache_values[key]
+
+        result = func(*args, **kwargs)
+        cache_values[key] = result
+        return result
+
+    return wrapper
+```
+
+This makes sure **every combination of inputs** (positional + keyword) is cached safely.
+
+---
+
+## ✅ TL;DR Summary:
+
+| Concept       | Meaning                                                                      |
+| ------------- | ---------------------------------------------------------------------------- |
+| **Hashable**  | Can be used as dictionary key or set item (must be immutable)                |
+| **Tuple**     | Hashable if inside elements are hashable                                     |
+| **List**      | ❌ Not hashable because it can change                                         |
+| **Dict**      | ❌ Not hashable (mutable)                                                     |
+| **frozenset** | ✅ Hashable version of a set — used to represent dict safely as part of a key |
+
+---
+
+Still unsure? Want to play with this interactively? I can make a small demo code you can run to see how hashable vs unhashable works.
+
+Great question! Let's go step by step and **explain exactly why the second call still takes time**, even though it looks like the same input.
+
+---
+
+## 🧠 Your Decorator Works Like This:
+
+You're caching based on this:
+
+```python
+if args in cache_values:
+```
+
+That means you're using **only `args` (positional arguments)** to check the cache.
+
+---
+
+## Let's see your calls one by one:
+
+```python
+print(long_running_function(1, b=2))  # ⏳ SLOW — kwargs used
+print(long_running_function(1, b=2))  # ⏳ SLOW AGAIN — still uses kwargs!
+print(long_running_function(1, 2))    # ⏳ SLOW — args used
+print(long_running_function(3, 4))    # ⏳ SLOW — new input
+```
+
+---
+
+## 🤯 But wait! `1 + 2` is the same, right?
+
+Yes — **but the way you passed the arguments matters**.
+
+Let’s look at what gets stored as `args` and `kwargs` inside the `wrapper()`:
+
+| Function Call                   | `args`   | `kwargs`   | Cache Key Used |
+| ------------------------------- | -------- | ---------- | -------------- |
+| `long_running_function(1, b=2)` | `(1,)`   | `{'b': 2}` | `(1,)` → wrong |
+| `long_running_function(1, 2)`   | `(1, 2)` | `{}`       | `(1, 2)`       |
+
+In the first case:
+
+* You pass `b` as a keyword argument.
+* So `args = (1,)`, and `kwargs = {'b': 2}`
+
+Your code checks:
+
+```python
+if args in cache_values:  # only (1,) is checked
+```
+
+It **ignores** `kwargs`!
+
+So the cache doesn’t recognize the second call as a repeat — it recomputes.
+
+---
+
+## ✅ Solution: Fix your key to use both `args` and `kwargs`
+
+Use this updated version of the decorator:
+
+```python
+def cachee(func):
+    cache_values = {}
+
+    def wrapper(*args, **kwargs):
+        key = (args, frozenset(kwargs.items()))  # use both args and kwargs
+
+        if key in cache_values:
+            return cache_values[key]
+
+        result = func(*args, **kwargs)
+        cache_values[key] = result
+        return result
+
+    return wrapper
+```
+
+---
+
+## Now run this:
+
+```python
+@cachee
+def long_running_function(a, b):
+    time.sleep(4)
+    return a + b
+
+print(long_running_function(1, b=2))  # ⏳ slow
+print(long_running_function(1, b=2))  # ⚡ fast
+print(long_running_function(1, 2))    # ⚡ fast
+print(long_running_function(3, 4))    # ⏳ slow
+```
+
+This will now cache results **correctly** for all combinations of args and kwargs.
+
+---
+
+## 🔑 Summary:
+
+* Your original code only cached `args` → ignored `kwargs`.
+* That's why calling `f(1, b=2)` didn’t match the cache.
+* Solution: Use both `args` and `frozenset(kwargs.items())` to build a complete and hashable key.
+
+Let me know if you want me to print the keys being stored — it’ll help you see what’s happening inside the cache!
+
+Perfect Hari! Let’s now **break it down slowly** and explain why **dictionaries (`dict`) are unhashable** with **a real code example**, visuals, and analogy.
+
+---
+
+## 🚀 First: What is "Hashable"?
+
+* **Hashable** means: an object has a fixed "identity" (a hash value) and can be used as:
+
+  * A **key in a dictionary**
+  * An **element in a set**
+
+### ✅ Example of hashable things:
+
+```python
+x = (1, 2)         # tuple
+y = "hello"        # string
+z = 5              # integer
+
+# All can be used as keys
+my_dict = {
+    x: "Tuple!",
+    y: "String!",
+    z: "Number!"
+}
+```
+
+No problem. These are hashable.
+
+---
+
+## ❌ Now: What if we try to use a `dict` as a key?
+
+```python
+my_dict = {
+    {"a": 1}: "Data"  # ❌
+}
+```
+
+You will get this error:
+
+```
+TypeError: unhashable type: 'dict'
+```
+
+---
+
+## 🧪 Why? Here's a **demonstration**:
+
+```python
+my_dict = {"name": "Hari"}
+print(hash(my_dict))  # ❌ ERROR
+```
+
+Output:
+
+```
+TypeError: unhashable type: 'dict'
+```
+
+Because dictionaries **can change after creation**:
+
+```python
+my_dict["age"] = 25
+```
+
+→ Now the content has changed → so its hash value (if it had one) would become invalid!
+
+---
+
+## 🔐 But a key in a dictionary must stay stable
+
+Imagine a key like this:
+
+```python
+locker_key = {"name": "Hari"}  # ❌ dict used as key
+```
+
+Now what if we changed it?
+
+```python
+locker_key["name"] = "Ramesh"
+```
+
+→ The locker system would get confused! You just changed the key it was using!
+
+That’s why **mutable types like `dict`, `list`, and `set` are not hashable** — because they’re **not safe** as identifiers in a dictionary.
+
+---
+
+## ✅ What is safe (hashable)?
+
+Immutable types — those that **can't be changed**.
+
+| Type    | Can Change? | Hashable? |
+| ------- | ----------- | --------- |
+| `int`   | ❌ No        | ✅ Yes     |
+| `str`   | ❌ No        | ✅ Yes     |
+| `tuple` | ❌ No        | ✅ Yes\*   |
+| `list`  | ✅ Yes       | ❌ No      |
+| `dict`  | ✅ Yes       | ❌ No      |
+
+\* only if tuple contains hashable values
+
+---
+
+## 👀 Visual Analogy
+
+| Object Type           | Real World Example | Can be a Key?              |
+| --------------------- | ------------------ | -------------------------- |
+| `dict`                | Whiteboard         | ❌ You can erase/change it  |
+| `list`                | Sticky Note        | ❌ You can peel and rewrite |
+| `str`, `int`, `tuple` | Engraved ID card   | ✅ Fixed and unchangeable   |
+
+---
+
+## 🔧 Solution: Use `frozenset` to "freeze" a dict
+
+```python
+d = {'a': 1, 'b': 2}
+frozen = frozenset(d.items())  # ✅ This is hashable!
+print(hash(frozen))            # ✅ This works
+```
+
+Now you can use it safely:
+
+```python
+cache = {}
+cache[frozenset({'a': 1, 'b': 2}.items())] = "Cached Result"
+```
+
+---
+
+## ✅ Final Code Example
+
+```python
+normal_dict = {'x': 10, 'y': 20}
+try:
+    hash(normal_dict)  # ❌
+except TypeError as e:
+    print("❌ Error:", e)
+
+frozen_key = frozenset(normal_dict.items())  # ✅
+print("✅ Hash:", hash(frozen_key))  # ✅ Works!
+```
+
+---
+
+## 🎯 Summary
+
+| Concept             | Explanation                                                         |
+| ------------------- | ------------------------------------------------------------------- |
+| **Hashable**        | Can be used as dictionary key or set element                        |
+| **Mutable**         | Can change (like dict, list) — not safe for hashing                 |
+| **Dict Unhashable** | Because its content can change — not safe to be a key               |
+| **Fix**             | Use `frozenset(dict.items())` to create a frozen, immutable version |
+
+---
+
+Want me to create a short diagram or animation that visually shows how a dict becomes unsafe vs how a frozen set becomes stable?
+Great question, Hari! Let's explain **`hash`** and **`hashable`** in the simplest possible way — with real-life examples and Python code.
+
+---
+
+## 🔐 What is a **hash**?
+
+A **hash** is a fixed-size number that uniquely represents an object’s content.
+
+In Python, it's generated by the built-in function:
+
+```python
+hash(object)
+```
+
+---
+
+## 💡 Real-Life Analogy
+
+Imagine you're locking your file in a **digital locker**.
+To open it later, you need a **unique key** for that file.
+
+That **key = hash value**
+
+Example:
+
+```python
+print(hash("hari"))  # 3276048218444157600  (example)
+```
+
+Same input → same hash value
+Different input → different hash value
+
+---
+
+## ✅ What is **hashable**?
+
+An object is **hashable** if:
+
+1. It has a `hash()` value.
+2. Its content does not change (i.e. it’s **immutable**).
+
+If both are true, then:
+✅ It can be used as a **dictionary key** or put into a **set**.
+
+---
+
+## 🚫 What is **not hashable**?
+
+Any object that is **mutable** (can change), like:
+
+* `list`
+* `dict`
+* `set`
+
+Why? Because if the content changes, its hash would change too — and that **breaks the dictionary**.
+
+---
+
+## 🧪 Python Example
+
+```python
+# Hashable
+print(hash("hello"))     # ✅
+print(hash(123))         # ✅
+print(hash((1, 2, 3)))    # ✅ tuple with hashable items
+
+# Not Hashable
+print(hash([1, 2, 3]))    # ❌ list → TypeError
+```
+
+### ❗ Error:
+
+```
+TypeError: unhashable type: 'list'
+```
+
+---
+
+## ✅ Summary Table
+
+| Type        | Mutable? | Hashable? | Can be dict key? |
+| ----------- | -------- | --------- | ---------------- |
+| `int`       | ❌ No     | ✅ Yes     | ✅ Yes            |
+| `str`       | ❌ No     | ✅ Yes     | ✅ Yes            |
+| `tuple`     | ❌ No\*   | ✅ Yes\*   | ✅ Yes            |
+| `list`      | ✅ Yes    | ❌ No      | ❌ No             |
+| `dict`      | ✅ Yes    | ❌ No      | ❌ No             |
+| `frozenset` | ❌ No     | ✅ Yes     | ✅ Yes            |
+
+> \* tuple is hashable **only if** all inside elements are also hashable
+
+---
+
+## 🎯 TL;DR
+
+| Term         | Meaning                                                   |
+| ------------ | --------------------------------------------------------- |
+| `hash()`     | Returns a number (unique identity) for an object          |
+| **Hashable** | Can be used as dict key / set element — must be immutable |
+| Not Hashable | List, Dict, Set (because they can change!)                |
+
+---
+
+Would you like a visual or animation that shows how hash maps work internally using keys and hash values?
+
+
+Great Hari! Let's explore the **structure of `frozenset(d.items())`** step by step so it's crystal clear. 🧠✨
+
+---
+
+## Step-by-step Breakdown:
+
+### Step 1: The Dictionary
+
+```python
+d = {'a': 1, 'b': 2}
+```
+
+This is a **normal Python dictionary**:
+It contains two key-value pairs:
+
+```
+'a' → 1  
+'b' → 2
+```
+
+---
+
+### Step 2: `d.items()`
+
+```python
+print(d.items())
+```
+
+This gives you a **`dict_items` object**, which looks like:
+
+```
+dict_items([('a', 1), ('b', 2)])
+```
+
+It’s basically a list of tuples — each tuple is a key-value pair.
+
+---
+
+### Step 3: `frozenset(d.items())`
+
+```python
+frozen = frozenset(d.items())
+```
+
+Now you're creating a **frozenset** — which is:
+
+* Like a `set`, but **immutable**
+* So you can't add/remove/update items
+
+### ✅ Final Structure:
+
+```
+frozenset({('a', 1), ('b', 2)})
+```
+
+* It’s a set of **tuples**.
+* Each tuple = one key-value pair from the dictionary.
+* Order may vary, because sets are unordered.
+
+---
+
+### 🔍 Output of your code:
+
+```python
+d = {'a': 1, 'b': 2}
+frozen = frozenset(d.items())
+print(frozen)
+```
+
+👀 You will see output like:
+
+```
+frozenset({('a', 1), ('b', 2)})
+```
+
+(Note: Order might be `('b', 2), ('a', 1)` depending on internal hashing.)
+
+---
+
+## 📦 Structure Visually:
+
+```
+frozenset
+   └── set
+        ├── ('a', 1)
+        └── ('b', 2)
+```
+
+Each `('key', value)` tuple is inside the frozen set.
+
+---
+
+## ✅ Why is this useful?
+
+Because:
+
+* `dict` is unhashable ❌
+* `frozenset(dict.items())` is hashable ✅
+
+So now, you can use it like:
+
+```python
+cache = {}
+cache[frozenset(d.items())] = "Cached result"
+```
+
+---
+
+## TL;DR
+
+| Expression             | Type                  | Example Output                     |
+| ---------------------- | --------------------- | ---------------------------------- |
+| `d`                    | `dict`                | `{'a': 1, 'b': 2}`                 |
+| `d.items()`            | `dict_items`          | `dict_items([('a', 1), ('b', 2)])` |
+| `frozenset(d.items())` | `frozenset` of tuples | `frozenset({('a', 1), ('b', 2)})`  |
+
+---
+
+Let me know if you want a diagram or how `frozenset` compares to `tuple`, `list`, or `set`!
