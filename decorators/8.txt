@@ -150,3 +150,171 @@ def log_calls(func):
 ---
 
 Let me know if you want me to diagram this with arrows showing the flow!
+
+
+
+Perfect — let's walk through the **`slow_add` function** with stacked decorators **`@log_calls @timer`** in complete detail and super simple steps.
+
+---
+
+## ✅ Original Function
+
+```python
+@log_calls
+@timer
+def slow_add(a, b):
+    time.sleep(1)
+    return a + b
+```
+
+---
+
+### 🤯 What Python does behind the scenes:
+
+Python **replaces** your function step-by-step like this (from bottom to top):
+
+### 🔹 Step 1: Apply `@timer`
+
+```python
+# This runs first
+temp = timer(slow_add)
+```
+
+* `timer` is called and passed the original `slow_add`
+* It returns a new function `wrapper`, which:
+
+  * Starts a timer
+  * Calls `slow_add`
+  * Ends the timer
+  * Prints time taken
+  * Returns the result
+
+Now:
+
+```python
+# So temp is the new wrapped version of slow_add
+# (but it still calls the original slow_add inside)
+```
+
+---
+
+### 🔹 Step 2: Apply `@log_calls`
+
+```python
+# Then this wraps the timer-wrapped version
+slow_add = log_calls(temp)
+```
+
+* `log_calls` takes `temp` (the result of `timer(slow_add)`)
+* It returns a **new `wrapper`** which:
+
+  * Logs the function name and arguments before the call
+  * Calls `temp` (which includes timer logic)
+  * Logs the result after the call
+  * Returns the result
+
+So final structure:
+
+```python
+slow_add = log_calls(timer(original_slow_add))
+```
+
+---
+
+### 🧠 FUNCTION CHAIN
+
+When you run:
+
+```python
+slow_add(3, 4)
+```
+
+You're actually calling:
+
+```python
+log_calls(timer(original_slow_add))(3, 4)
+```
+
+Which means:
+
+1. `log_calls.wrapper(3, 4)` runs:
+
+   * Logs: `Calling wrapper with args=(3, 4)`
+2. Inside `log_calls.wrapper`, it calls `timer.wrapper(3, 4)`:
+
+   * Starts the timer
+   * Calls the **original** `slow_add(3, 4)`
+   * Ends the timer
+   * Prints time taken
+3. Control goes back to `log_calls.wrapper`
+
+   * Logs the returned value
+   * Returns the value to caller
+
+---
+
+## 📦 Step-by-step Output Flow for `slow_add(3, 4)`
+
+```python
+print("=== slow_add ===")
+slow_add(3, 4)
+```
+
+### 🧾 Behind the scenes:
+
+1. `log_calls.wrapper` called:
+
+   ```
+   [LOG] Calling wrapper with args=(3, 4), kwargs={}
+   ```
+
+2. Inside it, `timer.wrapper` runs:
+
+   * Calls the original `slow_add(3, 4)` → sleeps 1 second
+   * Measures time taken:
+
+     ```
+     [TIMER] slow_add took 1.0000 seconds
+     ```
+
+3. Returns value `7` to `log_calls.wrapper`, which prints:
+
+   ```
+   [LOG] wrapper returned 7
+   ```
+
+---
+
+## 💡 Why You See `wrapper` Instead of `slow_add`
+
+Both decorators define their inner function as `wrapper`.
+
+```python
+def wrapper(...): ...
+```
+
+Unless you do this:
+
+```python
+from functools import wraps
+
+@wraps(func)
+def wrapper(...):
+```
+
+Python loses the original function’s name.
+
+---
+
+### ✅ Final Output Example:
+
+```text
+=== slow_add ===
+[LOG] Calling wrapper with args=(3, 4), kwargs={}
+[TIMER] slow_add took 1.0001 seconds
+[LOG] wrapper returned 7
+```
+
+---
+
+Would you like a diagram showing the wrapper stacking visually?
