@@ -318,3 +318,69 @@ Python loses the original function’s name.
 ---
 
 Would you like a diagram showing the wrapper stacking visually?
+
+
+Yes, **decorators are applied from bottom to top** (i.e., the one closest to the function is applied first).
+
+---
+
+### 🔁 Let's look at your example:
+
+```python
+@log_calls
+@timer
+def slow_add(a, b):
+    time.sleep(1)
+    return a + b
+```
+
+This is **equivalent to**:
+
+```python
+def slow_add(a, b):
+    time.sleep(1)
+    return a + b
+
+slow_add = log_calls(timer(slow_add))
+```
+
+---
+
+### 🔍 Step-by-step execution:
+
+1. `@timer` wraps `slow_add`
+   → Now `slow_add` is a `wrapper` that **measures execution time**.
+
+2. Then `@log_calls` wraps **the already wrapped version**
+   → Now it's a `wrapper` that **logs the call** and then calls the timer wrapper.
+
+---
+
+### 🧠 Execution Order When You Call `slow_add(3, 4)`:
+
+* `log_calls.wrapper` is entered:
+
+  * Logs: `"Calling slow_add with args=(3, 4)"`
+  * Calls the **inner** `timer.wrapper`
+
+    * Starts timer
+    * Calls actual `slow_add` function (sleeps 1 second)
+    * Ends timer
+    * Prints `"took 1.000x seconds"`
+    * Returns result to `log_calls`
+  * Logs: `"slow_add returned 7"`
+  * Returns the result
+
+---
+
+### 🔁 Final Execution Flow:
+
+```text
+log_calls.wrapper
+  → timer.wrapper
+    → actual slow_add
+```
+
+So yes — **decorators apply bottom to top, but execute top to bottom** in the resulting nested wrappers.
+
+Let me know if you want me to draw a flow diagram or generate visuals for this.
