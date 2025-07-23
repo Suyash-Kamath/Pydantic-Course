@@ -1,4 +1,3 @@
-
 import time
 
 # Decorator to log function calls
@@ -39,3 +38,5 @@ if __name__ == "__main__":
 
     print("\n=== slow_multiply ===")
     slow_multiply(3, 4)
+
+

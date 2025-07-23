@@ -1,0 +1,152 @@
+You're exploring **stackable decorators**, and this is an excellent example! Let's break down exactly **how it runs behind the scenes** step by step.
+
+---
+
+## 🔁 Stackable Decorators
+
+In this example:
+
+```python
+@log_calls
+@timer
+def slow_add(a, b):
+```
+
+Python applies the decorators from **bottom to top**, like this:
+
+```python
+slow_add = log_calls(timer(slow_add))
+```
+
+---
+
+Similarly:
+
+```python
+@timer
+@log_calls
+def slow_multiply(a, b):
+```
+
+Is equivalent to:
+
+```python
+slow_multiply = timer(log_calls(slow_multiply))
+```
+
+---
+
+## 📦 Full Behind-the-Scenes Breakdown
+
+### 1. `@log_calls @timer slow_add` becomes:
+
+```python
+# Original function
+def slow_add(a, b):
+    time.sleep(1)
+    return a + b
+
+# Decorate
+step1 = timer(slow_add)        # adds timing logic
+slow_add = log_calls(step1)    # wraps that with logging logic
+```
+
+#### Final `slow_add` call stack:
+
+```text
+You call:          slow_add(3, 4)
+Calls:             log_calls(wrapper) → timer(wrapper) → original slow_add()
+```
+
+So:
+
+1. `log_calls` logs "Calling slow\_add"
+2. `timer` times the execution
+3. Original function runs
+4. `timer` prints time
+5. `log_calls` logs the return value
+
+---
+
+### 2. `@timer @log_calls slow_multiply` becomes:
+
+```python
+# Original function
+def slow_multiply(a, b):
+    time.sleep(1)
+    return a * b
+
+# Decorate
+step1 = log_calls(slow_multiply)  # adds logging first
+slow_multiply = timer(step1)      # then wraps that with timer
+```
+
+#### Final `slow_multiply` call stack:
+
+```text
+You call:           slow_multiply(3, 4)
+Calls:              timer(wrapper) → log_calls(wrapper) → original slow_multiply()
+```
+
+So:
+
+1. `timer` starts timing
+2. `log_calls` logs call
+3. Original function runs
+4. `log_calls` logs return value
+5. `timer` prints time
+
+---
+
+## 🧠 Order Matters!
+
+| Decorator Order     | Outer Decorator | Inner Decorator | What happens first |
+| ------------------- | --------------- | --------------- | ------------------ |
+| `@log_calls @timer` | log\_calls      | timer           | Log, then time     |
+| `@timer @log_calls` | timer           | log\_calls      | Time, then log     |
+
+---
+
+## 🔍 Output Example:
+
+### For `slow_add(3, 4)`:
+
+```text
+=== slow_add ===
+[LOG] Calling wrapper with args=(3, 4), kwargs={}
+[TIMER] slow_add took 1.0001 seconds
+[LOG] wrapper returned 7
+```
+
+(You see `wrapper` instead of `slow_add` because function name isn't preserved unless you use `functools.wraps()`.)
+
+---
+
+### For `slow_multiply(3, 4)`:
+
+```text
+=== slow_multiply ===
+[TIMER] wrapper took 1.0002 seconds
+[LOG] Calling slow_multiply with args=(3, 4), kwargs={}
+[LOG] slow_multiply returned 12
+```
+
+---
+
+## ✅ Tip: Preserve Function Name Using `functools.wraps`
+
+To avoid seeing `wrapper` as the name, use:
+
+```python
+from functools import wraps
+
+def log_calls(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        ...
+    return wrapper
+```
+
+---
+
+Let me know if you want me to diagram this with arrows showing the flow!
